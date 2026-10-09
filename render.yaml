@@ -56,11 +56,11 @@ services:
         value: 20.18.0
       - key: NODE_ENV
         value: production
-      - key: NEXT_INTERNAL_API_HOSTPORT
-        fromService:
-          type: web
-          name: memory-leak-api
-          property: hostport
+      # This is intentionally a public HTTPS URL. Next.js evaluates the page
+      # at runtime, and Render does not expose a private-service host/port to
+      # this standalone Node process consistently on the free tier.
+      - key: NEXT_INTERNAL_API_URL
+        value: https://memory-leak-api.onrender.com
 
 databases:
   - name: memory-leak-db
