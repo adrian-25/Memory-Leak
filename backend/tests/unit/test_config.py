@@ -57,7 +57,6 @@ class TestSettings:
     def test_database_url_uses_render_connection_string(self):
         s = Settings(
             app_secret_key="x" * 32,
-            postgres_password="testpwd",
             neo4j_password="testpwd",
             DATABASE_URL="postgresql://render_user:render_pass@render-host:5432/render_db",
         )

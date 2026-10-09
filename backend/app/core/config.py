@@ -7,7 +7,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, computed_field
+from pydantic import Field, computed_field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     postgres_port: int = 5432
     postgres_db: str = "memoryleak"
     postgres_user: str = "memoryleak_user"
-    postgres_password: str = Field(..., min_length=1)
+    postgres_password: str | None = Field(default=None, min_length=1)
 
     # Managed platforms such as Render provide a single Postgres connection
     # string.  Keep the individual settings for local Docker Compose, while
@@ -99,6 +99,13 @@ class Settings(BaseSettings):
         if self.postgres_url.startswith("postgres://"):
             return self.postgres_url.replace("postgres://", f"{driver}://", 1)
         return self.postgres_url
+
+    @model_validator(mode="after")
+    def validate_database_configuration(self) -> "Settings":
+        """Accept either Render's complete URL or local Compose credentials."""
+        if not self.postgres_url and not self.postgres_password:
+            raise ValueError("POSTGRES_PASSWORD is required when DATABASE_URL is not set")
+        return self
 
 
 @lru_cache
