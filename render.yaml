@@ -47,7 +47,9 @@ services:
     region: singapore
     plan: free
     rootDir: frontend
-    buildCommand: npm ci && npm run build
+    # TypeScript and Tailwind are development dependencies but are required by
+    # `next build`; include them even though NODE_ENV is production at runtime.
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: npm start
     envVars:
       - key: NODE_VERSION
