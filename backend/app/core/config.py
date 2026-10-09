@@ -42,9 +42,11 @@ class Settings(BaseSettings):
     postgres_url: str | None = Field(default=None, validation_alias="DATABASE_URL")
 
     # ── Neo4j ──────────────────────────────────────────────────────────────────
-    neo4j_uri: str = "bolt://neo4j:7687"
-    neo4j_user: str = "neo4j"
-    neo4j_password: str = Field(..., min_length=1)
+    # Neo4j is a derived view rather than the system of record. It is
+    # optional in hosted starter deployments and can be connected later.
+    neo4j_uri: str | None = None
+    neo4j_user: str | None = None
+    neo4j_password: str | None = Field(default=None, min_length=1)
 
     # ── Embeddings ─────────────────────────────────────────────────────────────
     embedding_model: str = "all-MiniLM-L6-v2"

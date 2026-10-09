@@ -36,6 +36,7 @@ function StatusBadge({ status }: { status: string }) {
     degraded: "bg-amber-100 text-amber-700",
     error: "bg-red-100 text-red-700",
     not_initialised: "bg-slate-100 text-slate-500",
+    not_configured: "bg-slate-100 text-slate-500",
     extension_not_installed: "bg-red-100 text-red-700",
     unhealthy: "bg-red-100 text-red-700",
   };

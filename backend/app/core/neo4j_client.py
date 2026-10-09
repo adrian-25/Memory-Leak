@@ -33,6 +33,10 @@ def init_neo4j() -> None:
     """
     global _driver
     settings = get_settings()
+    if not all((settings.neo4j_uri, settings.neo4j_user, settings.neo4j_password)):
+        logger.warning("neo4j_not_configured")
+        return
+
     _driver = AsyncGraphDatabase.driver(
         settings.neo4j_uri,
         auth=(settings.neo4j_user, settings.neo4j_password),
@@ -70,7 +74,7 @@ async def check_neo4j_connection() -> dict[str, str]:
     Returns a status dict suitable for the /health endpoint.
     """
     if _driver is None:
-        return {"status": "not_initialised"}
+        return {"status": "not_configured"}
 
     try:
         await _driver.verify_connectivity()
