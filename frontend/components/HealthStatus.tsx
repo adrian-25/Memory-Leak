@@ -57,8 +57,7 @@ export default async function HealthStatus() {
   if (!health) {
     return (
       <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-        ⚠️ Could not reach backend. Ensure the Docker stack is running:{" "}
-        <code className="font-mono text-xs">docker compose up</code>
+        ⚠️ Could not reach the API. Please try again in a moment.
       </div>
     );
   }

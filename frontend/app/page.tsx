@@ -11,6 +11,11 @@
 import { Suspense } from "react";
 import HealthStatus from "@/components/HealthStatus";
 
+// The health card depends on a runtime-only Render private-network variable.
+// Rendering it dynamically prevents Next from baking the local-development
+// fallback into the production page during `next build`.
+export const dynamic = "force-dynamic";
+
 export default function HomePage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-8">
