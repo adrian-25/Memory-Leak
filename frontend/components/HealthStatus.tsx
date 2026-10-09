@@ -11,11 +11,19 @@
 
 import type { HealthResponse, ServiceHealthStatus } from "@/types/api";
 
-const BACKEND_URL = process.env.NEXT_INTERNAL_API_HOSTPORT
-  ? `http://${process.env.NEXT_INTERNAL_API_HOSTPORT}`
-  : process.env.NEXT_INTERNAL_API_URL?.replace("/api/v1", "") ||
-    process.env.NEXT_PUBLIC_API_BASE_URL?.replace("/api/v1", "") ||
-    "http://localhost:8000";
+const LOCAL_BACKEND_URL = "http://localhost:8000";
+const RENDER_API_URL = "https://memory-leak-api.onrender.com";
+
+// Prefer an explicit URL over the legacy host/port setting. Render can retain
+// removed Blueprint variables, and the old private value otherwise overrides
+// the working HTTPS address at runtime.
+const BACKEND_URL =
+  process.env.NEXT_INTERNAL_API_URL?.replace("/api/v1", "") ||
+  process.env.NEXT_PUBLIC_API_BASE_URL?.replace("/api/v1", "") ||
+  (process.env.NODE_ENV === "production" ? RENDER_API_URL : undefined) ||
+  (process.env.NEXT_INTERNAL_API_HOSTPORT
+    ? `http://${process.env.NEXT_INTERNAL_API_HOSTPORT}`
+    : LOCAL_BACKEND_URL);
 
 async function getHealth(): Promise<HealthResponse | null> {
   try {
