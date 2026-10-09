@@ -10,7 +10,13 @@ from pydantic import BaseModel
 class ServiceHealthStatus(BaseModel):
     """Health status of a single downstream service."""
 
-    status: Literal["ok", "error", "not_initialised", "extension_not_installed"]
+    status: Literal[
+        "ok",
+        "error",
+        "not_initialised",
+        "not_configured",
+        "extension_not_installed",
+    ]
     detail: str | None = None
 
 
