@@ -5,7 +5,7 @@ const nextConfig = {
 
   // Allow Next.js server components to call the backend internally
   async rewrites() {
-    const internalApiUrl =
+    const configuredApiUrl =
       process.env.NEXT_INTERNAL_API_URL ||
       process.env.NEXT_PUBLIC_API_BASE_URL ||
       (process.env.NODE_ENV === "production"
@@ -13,6 +13,10 @@ const nextConfig = {
         : process.env.NEXT_INTERNAL_API_HOSTPORT
           ? `http://${process.env.NEXT_INTERNAL_API_HOSTPORT}/api/v1`
           : "http://localhost:8000/api/v1");
+    const normalizedApiUrl = configuredApiUrl.replace(/\/$/, "");
+    const internalApiUrl = normalizedApiUrl.endsWith("/api/v1")
+      ? normalizedApiUrl
+      : `${normalizedApiUrl}/api/v1`;
 
     return [
       {

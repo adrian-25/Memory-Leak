@@ -60,7 +60,7 @@ services:
       # at runtime, and Render does not expose a private-service host/port to
       # this standalone Node process consistently on the free tier.
       - key: NEXT_INTERNAL_API_URL
-        value: https://memory-leak-api.onrender.com
+        value: https://memory-leak-api.onrender.com/api/v1
 
 databases:
   - name: memory-leak-db
