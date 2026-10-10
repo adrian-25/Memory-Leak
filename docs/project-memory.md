@@ -6,19 +6,20 @@
 
 ## Current Phase
 
-**Phase 0 — Planning**
-Status: COMPLETED ✓
+**MVP console — foundation implemented**
+Status: IN PROGRESS
 
 ## Current Milestone
 
-Phase 0 complete. All planning documentation created and internally validated.
-**Ready to begin Phase 1 — Infrastructure.**
+The deployed product includes the Phase 1 infrastructure foundation and a
+synthetic-data decision console spanning dashboard, risks, knowledge,
+recommendations, simulation, and grounded query workflows.
 
 ## Overall Completion Estimate
 
 **Phase 0:** 100% complete
-**Phase 1 (Infrastructure):** 0% — not started
-**Overall MVP:** ~7% (Phase 0 of 14 phases complete)
+**Phase 1 (Infrastructure):** foundation complete
+**MVP console:** implemented with deterministic synthetic demonstration data
 
 ---
 
@@ -47,7 +48,8 @@ All documentation files created:
 
 ## What Is Currently Being Built
 
-Nothing — Phase 0 complete. Awaiting start of Phase 1.
+The product is now a working MVP demonstration console. The next build focus
+is replacing synthetic workspace data with the ingestion and scoring pipeline.
 
 ---
 
@@ -259,4 +261,4 @@ Do not recreate Phase 0 documentation.
 
 ## Last Updated
 
-2026-09-03 — Phase 0 complete. AI Agent (Kiro).
+2026-10-10 — Deployed integrated synthetic MVP console.

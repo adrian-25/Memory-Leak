@@ -1,96 +1,56 @@
-/**
- * MemoryLeak — Home page (Phase 1 shell)
- *
- * Displays a system status card by calling the backend /health endpoint.
- * This proves Frontend → Backend connectivity works.
- *
- * NOTE: This is the Phase 1 infrastructure shell.
- * The full dashboard (Phase 11) will replace this page.
- */
+"use client";
 
-import { Suspense } from "react";
-import HealthStatus from "@/components/HealthStatus";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
-// The health card depends on a runtime-only Render private-network variable.
-// Rendering it dynamically prevents Next from baking the local-development
-// fallback into the production page during `next build`.
-export const dynamic = "force-dynamic";
+type Severity = "critical" | "high" | "medium" | "low";
+type Section = "overview" | "risks" | "knowledge" | "recommendations" | "simulation";
+type Risk = { id: string; title: string; severity: Severity; score: number; category: string; owner: string; service: string; evidence: string; confidence: number };
+type Workspace = {
+  mode: string; generated_at: string; notice: string;
+  overview: { organizational_risk: number; risk_trend: number; knowledge_areas: number; documents_covered: number; coverage_trend: number; at_risk_services: number; recommendations_open: number; severity_counts: Record<Severity, number> };
+  risks: Risk[];
+  recommendations: Array<{ id: string; priority: Severity; title: string; description: string; evidence_count: number; status: string }>;
+  knowledge_areas: Array<{ id: string; name: string; category: string; experts: number; concentration: number; coverage: number; severity: Severity }>;
+  people: Array<{ id: string; name: string; role: string; team: string; areas: string[] }>;
+};
+type Simulation = { label: string; person: { name: string; role: string }; risk_delta: number; affected_services: string[]; affected_areas: string[]; backup_experts: string[]; recommended_actions: string[]; confidence: number };
+type Answer = { answer: string; citations: Array<{ source: string; detail: string }>; limitations: string };
+
+const nav: Array<{ id: Section; label: string; mark: string }> = [
+  { id: "overview", label: "Command center", mark: "01" }, { id: "risks", label: "Risk ledger", mark: "02" }, { id: "knowledge", label: "Knowledge coverage", mark: "03" }, { id: "recommendations", label: "Action queue", mark: "04" }, { id: "simulation", label: "Scenario lab", mark: "05" },
+];
+const tone: Record<Severity, string> = { critical: "border-rose-200 bg-rose-50 text-rose-700", high: "border-amber-200 bg-amber-50 text-amber-700", medium: "border-sky-200 bg-sky-50 text-sky-700", low: "border-emerald-200 bg-emerald-50 text-emerald-700" };
+function SeverityBadge({ severity }: { severity: Severity }) { return <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.13em] ${tone[severity]}`}>{severity}</span>; }
+function ScoreRing({ value }: { value: number }) { return <div className="grid h-24 w-24 place-items-center rounded-full border-[9px] border-teal-100 bg-teal-50 text-center"><div><span className="block font-mono text-2xl font-bold tracking-tight text-slate-950">{value}</span><span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">risk index</span></div></div>; }
 
 export default function HomePage() {
-  return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-8">
-      <div className="w-full max-w-2xl space-y-8">
-        {/* Header */}
-        <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold tracking-tight text-slate-900">
-            MemoryLeak
-          </h1>
-          <p className="text-lg text-slate-500">
-            Organizational Knowledge Risk &amp; Dependency Intelligence
-          </p>
-          <span className="inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">
-            Phase 1 — Infrastructure
-          </span>
-        </div>
-
-        {/* Infrastructure Status */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-slate-400">
-            Infrastructure Status
-          </h2>
-          <Suspense fallback={<StatusSkeleton />}>
-            <HealthStatus />
-          </Suspense>
-        </div>
-
-        {/* Phase roadmap */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-slate-400">
-            Development Status
-          </h2>
-          <div className="space-y-2 text-sm">
-            {[
-              { phase: "Phase 0", label: "Planning", done: true },
-              { phase: "Phase 1", label: "Infrastructure", active: true },
-              { phase: "Phase 2", label: "Synthetic Data Engine", done: false },
-              { phase: "Phase 3", label: "Ingestion Pipeline", done: false },
-              { phase: "Phase 4", label: "NLP + Embeddings", done: false },
-              { phase: "Phase 5", label: "Knowledge Graph", done: false },
-              { phase: "Phase 6", label: "Intelligence Engine", done: false },
-            ].map(({ phase, label, done, active }) => (
-              <div
-                key={phase}
-                className={`flex items-center justify-between rounded-lg px-3 py-2 ${
-                  active
-                    ? "bg-indigo-50 text-indigo-700"
-                    : done
-                    ? "text-slate-400"
-                    : "text-slate-500"
-                }`}
-              >
-                <span className="font-medium">{phase}</span>
-                <span>{label}</span>
-                <span className="text-xs">
-                  {active ? "▶ In progress" : done ? "✓ Complete" : "Pending"}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </main>
-  );
+  const [section, setSection] = useState<Section>("overview");
+  const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [severity, setSeverity] = useState<"all" | Severity>("all");
+  const [personId, setPersonId] = useState("maya-patel");
+  const [simulation, setSimulation] = useState<Simulation | null>(null);
+  const [simulating, setSimulating] = useState(false);
+  const [question, setQuestion] = useState("What should the Payments team do first?");
+  const [answer, setAnswer] = useState<Answer | null>(null);
+  const [asking, setAsking] = useState(false);
+  useEffect(() => { fetch("/api/v1/dashboard").then((res) => { if (!res.ok) throw new Error(); return res.json(); }).then((data: Workspace) => setWorkspace(data)).catch(() => setLoadError(true)); }, []);
+  const filteredRisks = useMemo(() => workspace?.risks.filter((risk) => severity === "all" || risk.severity === severity) ?? [], [workspace, severity]);
+  async function runSimulation() { setSimulating(true); try { const res = await fetch("/api/v1/simulation", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ person_id: personId }) }); if (!res.ok) throw new Error(); setSimulation(await res.json()); } finally { setSimulating(false); } }
+  async function askQuestion(event: FormEvent) { event.preventDefault(); setAsking(true); try { const res = await fetch("/api/v1/query", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question }) }); if (!res.ok) throw new Error(); setAnswer(await res.json()); } finally { setAsking(false); } }
+  if (!workspace && !loadError) return <LoadingScreen />;
+  if (loadError || !workspace) return <UnavailableScreen />;
+  return <main className="min-h-screen bg-[#f4f6f5] text-slate-900 selection:bg-teal-200"><div className="mx-auto flex min-h-screen max-w-[1500px] flex-col lg:flex-row"><aside className="border-b border-slate-200 bg-[#102a2a] px-5 py-6 text-slate-100 lg:w-72 lg:border-b-0 lg:border-r lg:px-6"><div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-lg bg-teal-300 font-mono text-lg font-black text-[#102a2a]">M/</div><div><p className="font-mono text-lg font-bold tracking-tight">MemoryLeak</p><p className="text-[10px] uppercase tracking-[0.18em] text-teal-200">risk intelligence</p></div></div><nav className="mt-9 flex gap-2 overflow-x-auto pb-1 lg:block lg:space-y-1 lg:overflow-visible">{nav.map((item) => <button key={item.id} onClick={() => setSection(item.id)} className={`group flex min-w-max items-center gap-3 rounded-md px-3 py-3 text-left text-sm transition lg:w-full ${section === item.id ? "bg-teal-300 font-semibold text-[#102a2a]" : "text-slate-300 hover:bg-white/10 hover:text-white"}`}><span className="font-mono text-[10px] opacity-70">{item.mark}</span>{item.label}</button>)}</nav><div className="mt-8 hidden border-t border-white/15 pt-5 lg:block"><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-teal-200">Data context</p><p className="mt-2 text-xs leading-5 text-slate-300">Synthetic demonstration workspace. Signals are about knowledge resilience, never employee performance.</p></div></aside><section className="min-w-0 flex-1 px-5 py-6 sm:px-8 lg:px-12 lg:py-9"><header className="mb-8 flex flex-col justify-between gap-5 border-b border-slate-200 pb-6 sm:flex-row sm:items-end"><div><p className="font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-teal-700">Organization / synthetic demo</p><h1 className="mt-2 font-serif text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">{nav.find((item) => item.id === section)?.label}</h1></div><div className="flex items-center gap-2 text-xs text-slate-500"><span className="h-2 w-2 rounded-full bg-teal-500" /> Updated {new Date(workspace.generated_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div></header>{section === "overview" && <Overview workspace={workspace} setSection={setSection} question={question} setQuestion={setQuestion} asking={asking} answer={answer} askQuestion={askQuestion} />}{section === "risks" && <RiskLedger risks={filteredRisks} severity={severity} setSeverity={setSeverity} />}{section === "knowledge" && <KnowledgeCoverage workspace={workspace} />}{section === "recommendations" && <Recommendations workspace={workspace} />}{section === "simulation" && <ScenarioLab people={workspace.people} personId={personId} setPersonId={setPersonId} simulation={simulation} simulating={simulating} runSimulation={runSimulation} />}</section></div></main>;
 }
 
-function StatusSkeleton() {
-  return (
-    <div className="space-y-3 animate-pulse">
-      {[1, 2, 3].map((i) => (
-        <div key={i} className="flex items-center justify-between">
-          <div className="h-4 w-24 rounded bg-slate-200" />
-          <div className="h-4 w-16 rounded bg-slate-200" />
-        </div>
-      ))}
-    </div>
-  );
-}
+function Overview({ workspace, setSection, question, setQuestion, asking, answer, askQuestion }: { workspace: Workspace; setSection: (section: Section) => void; question: string; setQuestion: (value: string) => void; asking: boolean; answer: Answer | null; askQuestion: (event: FormEvent) => void }) { const o = workspace.overview; return <div className="space-y-7"><div className="grid gap-5 xl:grid-cols-[1.3fr_.7fr]"><section className="overflow-hidden rounded-xl bg-[#113331] p-6 text-white shadow-sm sm:p-8"><p className="font-mono text-[10px] font-bold uppercase tracking-[0.17em] text-teal-200">Resilience readout</p><div className="mt-5 flex flex-col justify-between gap-6 sm:flex-row sm:items-end"><div><h2 className="max-w-md font-serif text-3xl leading-tight">Your most urgent exposure is concentrated payment knowledge.</h2><p className="mt-3 max-w-lg text-sm leading-6 text-slate-300">One person holds the strongest evidence trail for reconciliation and recovery. Start by transferring the workflow, not by assigning blame.</p></div><ScoreRing value={o.organizational_risk} /></div><button onClick={() => setSection("risks")} className="mt-7 rounded-md bg-teal-300 px-4 py-2.5 text-sm font-bold text-[#102a2a] transition hover:bg-teal-200">Review risk ledger →</button></section><section className="rounded-xl border border-slate-200 bg-white p-6"><p className="font-mono text-[10px] font-bold uppercase tracking-[0.17em] text-slate-500">Risk mix</p><div className="mt-6 space-y-4">{(["critical", "high", "medium", "low"] as Severity[]).map((key) => <div key={key} className="flex items-center gap-3"><SeverityBadge severity={key} /><div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100"><div className={`h-full ${key === "critical" ? "bg-rose-500" : key === "high" ? "bg-amber-500" : key === "medium" ? "bg-sky-500" : "bg-emerald-500"}`} style={{ width: `${(o.severity_counts[key] / 4) * 100}%` }} /></div><span className="font-mono text-sm font-bold">{o.severity_counts[key]}</span></div>)}</div><p className="mt-7 border-t border-slate-100 pt-4 text-xs leading-5 text-slate-500">{workspace.notice}</p></section></div><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric label="Risk index" value={`${o.organizational_risk}/100`} detail={`${Math.abs(o.risk_trend)} points lower than last review`} /><Metric label="Document coverage" value={`${o.documents_covered}%`} detail={`+${o.coverage_trend} points this cycle`} /><Metric label="At-risk services" value={String(o.at_risk_services)} detail="need a resilience action" /><Metric label="Open actions" value={String(o.recommendations_open)} detail="prioritized by evidence" /></div><section className="rounded-xl border border-slate-200 bg-white p-6"><div className="flex items-center justify-between"><div><p className="font-mono text-[10px] font-bold uppercase tracking-[0.17em] text-slate-500">Evidence assistant</p><h2 className="mt-1 font-serif text-2xl text-slate-950">Ask the workspace</h2></div><span className="rounded-full bg-teal-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-teal-700">grounded</span></div><form onSubmit={askQuestion} className="mt-5 flex flex-col gap-3 sm:flex-row"><input value={question} onChange={(event) => setQuestion(event.target.value)} className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-3 text-sm outline-none ring-teal-300 focus:ring-2" /><button disabled={asking} className="rounded-md bg-slate-900 px-5 py-3 text-sm font-bold text-white disabled:opacity-60">{asking ? "Checking evidence…" : "Ask"}</button></form>{answer && <div className="mt-5 rounded-lg bg-slate-50 p-4"><p className="text-sm leading-6 text-slate-700">{answer.answer}</p><div className="mt-4 grid gap-2 sm:grid-cols-2">{answer.citations.map((citation) => <div key={citation.source} className="rounded border border-slate-200 bg-white p-3"><p className="text-xs font-bold text-slate-900">{citation.source}</p><p className="mt-1 text-xs leading-5 text-slate-500">{citation.detail}</p></div>)}</div><p className="mt-3 text-[11px] text-slate-500">{answer.limitations}</p></div>}</section></div>; }
+function Metric({ label, value, detail }: { label: string; value: string; detail: string }) { return <div className="rounded-xl border border-slate-200 bg-white p-5"><p className="text-xs font-semibold text-slate-500">{label}</p><p className="mt-2 font-mono text-3xl font-bold tracking-tight text-slate-950">{value}</p><p className="mt-2 text-xs text-slate-500">{detail}</p></div>; }
+function RiskLedger({ risks, severity, setSeverity }: { risks: Risk[]; severity: "all" | Severity; setSeverity: (severity: "all" | Severity) => void }) { return <div><div className="mb-6 flex flex-wrap gap-2">{(["all", "critical", "high", "medium", "low"] as const).map((item) => <button key={item} onClick={() => setSeverity(item)} className={`rounded-full border px-3 py-1.5 text-xs font-bold capitalize ${severity === item ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-600 hover:border-slate-400"}`}>{item}</button>)}</div><div className="overflow-hidden rounded-xl border border-slate-200 bg-white"><div className="grid grid-cols-[1fr_auto] border-b border-slate-200 px-5 py-3 text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500 sm:grid-cols-[1.4fr_.7fr_.5fr_.5fr]"><span>Signal</span><span className="hidden sm:block">Service</span><span className="hidden sm:block">Score</span><span>Severity</span></div>{risks.map((risk) => <article key={risk.id} className="grid grid-cols-[1fr_auto] gap-4 border-b border-slate-100 px-5 py-5 last:border-0 sm:grid-cols-[1.4fr_.7fr_.5fr_.5fr]"><div><p className="font-semibold text-slate-900">{risk.title}</p><p className="mt-1 text-sm leading-6 text-slate-500">{risk.evidence}</p><p className="mt-2 text-xs text-slate-400">Evidence confidence {Math.round(risk.confidence * 100)}% · Owner: {risk.owner}</p></div><p className="hidden text-sm text-slate-600 sm:block">{risk.service}</p><p className="hidden font-mono text-lg font-bold text-slate-900 sm:block">{Math.round(risk.score * 100)}</p><SeverityBadge severity={risk.severity} /></article>)}</div></div>; }
+function KnowledgeCoverage({ workspace }: { workspace: Workspace }) { return <div className="space-y-6"><section className="rounded-xl border border-slate-200 bg-white p-6"><p className="font-mono text-[10px] font-bold uppercase tracking-[0.17em] text-slate-500">Where knowledge lives</p><h2 className="mt-2 font-serif text-2xl text-slate-950">Coverage improves when expertise has a durable trail.</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">Each area combines active expert evidence with documentation coverage. Concentration is a resilience signal, not a performance score.</p><div className="mt-7 space-y-5">{workspace.knowledge_areas.map((area) => <div key={area.id} className="grid gap-3 sm:grid-cols-[1.1fr_1fr_1fr_auto] sm:items-center"><div><p className="font-semibold text-slate-900">{area.name}</p><p className="text-xs text-slate-500">{area.category} · {area.experts} active expert{area.experts === 1 ? "" : "s"}</p></div><Bar label="Concentration" value={area.concentration} color={area.concentration > .8 ? "bg-rose-500" : "bg-amber-500"} /><Bar label="Documented" value={area.coverage} color="bg-teal-500" /><SeverityBadge severity={area.severity} /></div>)}</div></section><section className="rounded-xl border border-slate-200 bg-[#e8f3f1] p-6"><p className="font-mono text-[10px] font-bold uppercase tracking-[0.17em] text-teal-800">Relationship sketch</p><div className="mt-5 flex flex-wrap items-center gap-3 text-sm"><Node label="Maya Patel" kind="person" /><span className="text-teal-700">→ primary expert →</span><Node label="Payment reconciliation" kind="knowledge" /><span className="text-teal-700">→ supports →</span><Node label="Ledger service" kind="service" /></div></section></div>; }
+function Bar({ label, value, color }: { label: string; value: number; color: string }) { return <div><div className="mb-1 flex justify-between text-[10px] font-bold uppercase tracking-wider text-slate-500"><span>{label}</span><span>{Math.round(value * 100)}%</span></div><div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full ${color}`} style={{ width: `${value * 100}%` }} /></div></div>; }
+function Node({ label, kind }: { label: string; kind: string }) { return <span className={`rounded-md border px-3 py-2 font-medium ${kind === "person" ? "border-sky-200 bg-sky-50 text-sky-800" : kind === "knowledge" ? "border-amber-200 bg-amber-50 text-amber-800" : "border-teal-200 bg-white text-teal-800"}`}>{label}</span>; }
+function Recommendations({ workspace }: { workspace: Workspace }) { return <div className="grid gap-5 lg:grid-cols-3">{workspace.recommendations.map((recommendation) => <article key={recommendation.id} className="flex min-h-64 flex-col rounded-xl border border-slate-200 bg-white p-6"><div className="flex items-center justify-between"><SeverityBadge severity={recommendation.priority} /><span className="font-mono text-[10px] uppercase tracking-wider text-slate-400">{recommendation.status.replace("_", " ")}</span></div><h2 className="mt-6 font-serif text-2xl leading-tight text-slate-950">{recommendation.title}</h2><p className="mt-3 text-sm leading-6 text-slate-600">{recommendation.description}</p><div className="mt-auto border-t border-slate-100 pt-4 text-xs text-slate-500">{recommendation.evidence_count} linked evidence records</div></article>)}</div>; }
+function ScenarioLab({ people, personId, setPersonId, simulation, simulating, runSimulation }: { people: Workspace["people"]; personId: string; setPersonId: (id: string) => void; simulation: Simulation | null; simulating: boolean; runSimulation: () => void }) { return <div className="grid gap-6 xl:grid-cols-[.8fr_1.2fr]"><section className="rounded-xl bg-[#113331] p-6 text-white"><p className="font-mono text-[10px] font-bold uppercase tracking-[0.17em] text-teal-200">What-if scenario</p><h2 className="mt-3 font-serif text-3xl leading-tight">See the resilience gap before a transition happens.</h2><p className="mt-3 text-sm leading-6 text-slate-300">This produces an estimate from available evidence. It does not infer intent or predict employee behavior.</p><label className="mt-7 block text-xs font-bold text-teal-100">Person to remove from the evidence graph</label><select value={personId} onChange={(event) => setPersonId(event.target.value)} className="mt-2 w-full rounded-md border border-white/20 bg-white/10 px-3 py-3 text-sm text-white outline-none"><option className="text-slate-900" value="maya-patel">Maya Patel — Staff engineer</option>{people.filter((person) => person.id !== "maya-patel").map((person) => <option className="text-slate-900" key={person.id} value={person.id}>{person.name} — {person.role}</option>)}</select><button onClick={runSimulation} disabled={simulating} className="mt-4 w-full rounded-md bg-teal-300 px-4 py-3 text-sm font-bold text-[#102a2a] disabled:opacity-60">{simulating ? "Calculating estimate…" : "Run scenario"}</button></section>{simulation ? <section className="rounded-xl border border-slate-200 bg-white p-6"><p className="rounded bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">{simulation.label}</p><div className="mt-6 flex flex-col gap-2 border-b border-slate-100 pb-5 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-sm text-slate-500">If {simulation.person.name} became unavailable</p><p className="font-serif text-3xl text-slate-950">Risk index +{simulation.risk_delta}</p></div><p className="text-xs text-slate-500">Evidence confidence {Math.round(simulation.confidence * 100)}%</p></div><div className="mt-5 grid gap-5 sm:grid-cols-2"><List title="Affected services" values={simulation.affected_services} /><List title="Knowledge areas" values={simulation.affected_areas} /><List title="Validated backup" values={simulation.backup_experts} /><List title="Suggested next actions" values={simulation.recommended_actions} /></div></section> : <section className="grid min-h-72 place-items-center rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center"><div><p className="font-serif text-2xl text-slate-950">Ready when you are.</p><p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">Choose a person and run a scenario to reveal affected systems, potential backups, and practical mitigation steps.</p></div></section>}</div>; }
+function List({ title, values }: { title: string; values: string[] }) { return <div><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">{title}</p><ul className="mt-2 space-y-2">{values.map((value) => <li key={value} className="text-sm leading-5 text-slate-700">• {value}</li>)}</ul></div>; }
+function LoadingScreen() { return <main className="grid min-h-screen place-items-center bg-[#f4f6f5]"><div className="text-center"><div className="mx-auto h-9 w-9 animate-pulse rounded bg-teal-300" /><p className="mt-4 font-mono text-xs uppercase tracking-[0.16em] text-slate-500">Opening workspace</p></div></main>; }
+function UnavailableScreen() { return <main className="grid min-h-screen place-items-center bg-[#f4f6f5] p-6"><div className="max-w-md rounded-xl border border-slate-200 bg-white p-7"><p className="font-mono text-xs font-bold uppercase tracking-[0.16em] text-teal-700">Workspace unavailable</p><h1 className="mt-3 font-serif text-3xl text-slate-950">The decision console could not load.</h1><p className="mt-3 text-sm leading-6 text-slate-600">The API may be waking from Render&apos;s free-tier sleep. Refresh in a moment to load the synthetic demo workspace.</p></div></main>; }
