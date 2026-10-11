@@ -23,7 +23,10 @@ from app.services.workspace import get_or_create_organization, ingest_text, reco
 
 router = APIRouter(prefix="/api/v1", tags=["workspace"])
 
-SourceType = Literal["document", "code", "issue", "discussion", "config"]
+SourceType = Literal[
+    "pdf", "docx", "markdown", "txt", "python", "javascript", "typescript",
+    "java", "sql", "yaml", "json", "toml", "ini", "issues", "commits", "discussions",
+]
 
 
 class IngestTextRequest(BaseModel):
@@ -31,7 +34,7 @@ class IngestTextRequest(BaseModel):
     organization_name: str = Field(default="My workspace", min_length=1, max_length=255)
     title: str = Field(min_length=1, max_length=500)
     content: str = Field(min_length=1, max_length=100_000)
-    source_type: SourceType = "document"
+    source_type: SourceType = "txt"
     file_name: str = Field(default="evidence.txt", min_length=1, max_length=500)
     author_name: str | None = Field(default=None, max_length=255)
     service_name: str | None = Field(default=None, max_length=255)
@@ -101,7 +104,7 @@ async def upload_evidence(
     organization_slug: str = Form("default"),
     organization_name: str = Form("My workspace"),
     title: str | None = Form(None),
-    source_type: SourceType = Form("document"),
+    source_type: SourceType = Form("txt"),
     author_name: str | None = Form(None),
     service_name: str | None = Form(None),
     knowledge_areas: str = Form("[]"),
