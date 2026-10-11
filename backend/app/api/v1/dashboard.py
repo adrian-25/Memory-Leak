@@ -9,8 +9,12 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.database import get_db_session
+from app.services.workspace import workspace_dashboard, workspace_query, workspace_simulation
 
 router = APIRouter(prefix="/api/v1", tags=["intelligence"])
 
@@ -47,8 +51,13 @@ KNOWLEDGE = [
 
 
 @router.get("/dashboard")
-async def dashboard() -> dict[str, Any]:
-    """Return the complete synthetic workspace used by the MVP dashboard."""
+async def dashboard(
+    organization_slug: str = "default", session: AsyncSession = Depends(get_db_session)
+) -> dict[str, Any]:
+    """Return a persistent workspace when evidence exists, else the safe demo."""
+    persisted = await workspace_dashboard(session, organization_slug)
+    if persisted is not None:
+        return persisted
     return {
         "mode": "synthetic_demo",
         "generated_at": _now(),
@@ -85,17 +94,26 @@ async def dashboard() -> dict[str, Any]:
 
 
 @router.get("/risks")
-async def list_risks() -> dict[str, Any]:
+async def list_risks(organization_slug: str = "default", session: AsyncSession = Depends(get_db_session)) -> dict[str, Any]:
+    persisted = await workspace_dashboard(session, organization_slug)
+    if persisted is not None:
+        return {"data": persisted["risks"], "generated_at": persisted["generated_at"]}
     return {"data": RISKS, "generated_at": _now()}
 
 
 @router.get("/knowledge")
-async def list_knowledge() -> dict[str, Any]:
+async def list_knowledge(organization_slug: str = "default", session: AsyncSession = Depends(get_db_session)) -> dict[str, Any]:
+    persisted = await workspace_dashboard(session, organization_slug)
+    if persisted is not None:
+        return {"data": persisted["knowledge_areas"], "generated_at": persisted["generated_at"]}
     return {"data": KNOWLEDGE, "generated_at": _now()}
 
 
 @router.get("/recommendations")
-async def list_recommendations() -> dict[str, Any]:
+async def list_recommendations(organization_slug: str = "default", session: AsyncSession = Depends(get_db_session)) -> dict[str, Any]:
+    persisted = await workspace_dashboard(session, organization_slug)
+    if persisted is not None:
+        return {"data": persisted["recommendations"], "generated_at": persisted["generated_at"]}
     return {"data": RECOMMENDATIONS, "generated_at": _now()}
 
 
@@ -104,7 +122,10 @@ class SimulationRequest(BaseModel):
 
 
 @router.post("/simulation")
-async def simulate_departure(request: SimulationRequest) -> dict[str, Any]:
+async def simulate_departure(request: SimulationRequest, session: AsyncSession = Depends(get_db_session)) -> dict[str, Any]:
+    persisted = await workspace_simulation(session, request.person_id)
+    if persisted is not None:
+        return persisted
     person = next((item for item in PEOPLE if item["id"] == request.person_id), PEOPLE[0])
     is_maya = person["id"] == "maya-patel"
     return {
@@ -128,7 +149,12 @@ class QueryRequest(BaseModel):
 
 
 @router.post("/query")
-async def grounded_query(request: QueryRequest) -> dict[str, Any]:
+async def grounded_query(
+    request: QueryRequest, organization_slug: str = "default", session: AsyncSession = Depends(get_db_session)
+) -> dict[str, Any]:
+    persisted = await workspace_query(session, request.question, organization_slug)
+    if persisted is not None:
+        return persisted
     query = request.question.lower()
     selected = RISKS[0] if any(word in query for word in ("payment", "ledger", "maya", "reconciliation")) else RISKS[2]
     return {

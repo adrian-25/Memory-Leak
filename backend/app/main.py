@@ -17,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.health import router as health_router
 from app.api.v1.dashboard import router as dashboard_router
+from app.api.v1.workspace import router as workspace_router
 from app.core.config import get_settings
 from app.core.database import close_db, init_db
 from app.core.logging import configure_logging, get_logger
@@ -102,6 +103,7 @@ def create_app() -> FastAPI:
     # Health check is mounted at root (not under /api/v1) for easy access.
     app.include_router(health_router)
     app.include_router(dashboard_router)
+    app.include_router(workspace_router)
 
     # Phase 1 placeholder: future routers are registered here in later phases.
     # app.include_router(ingestion_router, prefix="/api/v1")
